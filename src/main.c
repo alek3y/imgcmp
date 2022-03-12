@@ -103,13 +103,20 @@ double image_difference(Image first, Image second) {
 	return total;
 }
 
-int main(void) {
-	Image image1 = image_load("image1.png"), image2 = image_load("image2.png");
+int main(int argc, char *argv[]) {
+	if (argc < 2) {
+		printf(
+			"Usage: %s IMAGE1 IMAGE2\n"
+			"Compute the similarity between two images as a percentage.\n",
+			argv[0]
+		);
+		return 0;
+	}
 
-	double difference = image_difference(image1, image2);
-	double percentage = difference / (RGB_MAX_DISTANCE * image_area(image1));
-	printf("%lf\n", percentage*100);
+	Image first = image_load(argv[1]), second = image_load(argv[2]);
 
-	image_free(image1);
-	image_free(image2);
+	double difference = image_difference(first, second) / (RGB_MAX_DISTANCE * image_area(first));
+	printf("%lf%%\n", (1 - difference) * 100);
+
+	image_free(first); image_free(second);
 }
