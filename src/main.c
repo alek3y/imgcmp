@@ -5,8 +5,9 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
+typedef unsigned char Channel;
 typedef struct {
-	unsigned char r, g, b;
+	Channel r, g, b, a;
 } Rgb;
 
 // ELI5:
@@ -39,16 +40,35 @@ double distance(double *first, double *second, int dimensions) {
 	return sqrt(pow(base, 2) + pow(height, 2));
 }
 
-// TODO: When opacity is 0, the values of r, g and b should be ignored
+double *rgb_copy_double(double *dest, Rgb src) {
+	Channel *channels = (Channel *) &src;
+	for (size_t i = 0; i < sizeof(src)/sizeof(*channels); i++) {
+		dest[i] = (double) channels[i];
+	}
+	return dest;
+}
+
 double rgb_difference(Rgb first, Rgb second) {
-	assert(0 && "TODO: Unimplemented");
+
+	// Ensure the other channels are the same when alpha is zero
+	if (first.a == 0 || second.a == 0) {
+		memcpy(&first, &second, sizeof(first) - sizeof(first.a));
+	}
+
+	size_t rgb_size = sizeof(first)/sizeof(first.r);
+	double first_point[rgb_size], second_point[rgb_size];
+
+	return distance(
+		rgb_copy_double(first_point, first),
+		rgb_copy_double(second_point, second),
+		rgb_size
+	);
 }
 
 int main(void) {
-	double point1[] = {2, 8};
-	double point2[] = {7, 0};
-
-	printf("%lf\n", distance(point1, point2, sizeof(point1)/sizeof(point1[0])));
+	Rgb color1 = {184, 64, 64, 255};
+	Rgb color2 = {179, 55, 55, 200};
+	printf("%lf\n", rgb_difference(color1, color2));
 }
 
 /*int main(void) {
