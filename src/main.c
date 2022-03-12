@@ -5,10 +5,18 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
+#define RGB_MAX_DISTANCE 510	// Diagonal from #00000000 to #ffffffff
+#define RGB_CHANNELS (sizeof(Rgb) / sizeof(Channel))
+
 typedef unsigned char Channel;
 typedef struct {
 	Channel r, g, b, a;
 } Rgb;
+
+typedef struct {
+	unsigned char *data;
+	int width, height;
+} Image;
 
 // ELI5:
 // The best way to find the distance between two points in any dimensions
@@ -42,7 +50,7 @@ double distance(double *first, double *second, int dimensions) {
 
 double *rgb_copy_double(double *dest, Rgb src) {
 	Channel *channels = (Channel *) &src;
-	for (size_t i = 0; i < sizeof(src)/sizeof(*channels); i++) {
+	for (size_t i = 0; i < RGB_CHANNELS; i++) {
 		dest[i] = (double) channels[i];
 	}
 	return dest;
@@ -52,35 +60,56 @@ double rgb_difference(Rgb first, Rgb second) {
 
 	// Ensure the other channels are the same when alpha is zero
 	if (first.a == 0 || second.a == 0) {
-		memcpy(&first, &second, sizeof(first) - sizeof(first.a));
+		memcpy(&first, &second, sizeof(Rgb) - sizeof(Channel));
 	}
 
-	size_t rgb_size = sizeof(first)/sizeof(first.r);
-	double first_point[rgb_size], second_point[rgb_size];
-
+	double first_point[RGB_CHANNELS], second_point[RGB_CHANNELS];
 	return distance(
 		rgb_copy_double(first_point, first),
 		rgb_copy_double(second_point, second),
-		rgb_size
+		RGB_CHANNELS
 	);
+}
+
+Image image_load(char *filename) {
+	Image image;
+	image.data = stbi_load(
+		filename,
+		&image.width, &image.height,
+		NULL, RGB_CHANNELS
+	);
+	return image;
+}
+
+size_t image_area(Image image) {
+	return (size_t) image.width * image.height;
+}
+
+void image_free(Image image) {
+	stbi_image_free(image.data);
+}
+
+double image_difference(Image first, Image second) {
+	assert(first.width == second.width && first.height == second.height);
+
+	double total = 0;
+	for (size_t i = 0; i < image_area(first) * RGB_CHANNELS; i += RGB_CHANNELS) {
+		Rgb first_pixel, second_pixel;
+		memcpy(&first_pixel, first.data + i, RGB_CHANNELS * sizeof(*first.data));
+		memcpy(&second_pixel, second.data + i, RGB_CHANNELS * sizeof(*second.data));
+		total += rgb_difference(first_pixel, second_pixel);
+	}
+
+	return total;
 }
 
 int main(void) {
-	Rgb color1 = {184, 64, 64, 255};
-	Rgb color2 = {179, 55, 55, 200};
-	printf("%lf\n", rgb_difference(color1, color2));
-}
+	Image image1 = image_load("image1.png"), image2 = image_load("image2.png");
 
-/*int main(void) {
-	int width, height;
-	unsigned char *pixels = stbi_load(
-		"image.png",
-		&width, &height,
-		NULL, 4 //3
-	);
-	printf("%dx%d\n", width, height);
-	printf(
-		"%u, %u, %u, %u\n",
-		pixels[0], pixels[1], pixels[2], pixels[3]
-	);
-}*/
+	double difference = image_difference(image1, image2);
+	double percentage = difference / (RGB_MAX_DISTANCE * image_area(image1));
+	printf("%lf\n", percentage*100);
+
+	image_free(image1);
+	image_free(image2);
+}
